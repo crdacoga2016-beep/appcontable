@@ -8,6 +8,8 @@ const App = {
   currentClient: null,
   filter: { start: '', end: '', text: '' },
   chart: null,
+  editingId: null,
+  pendingFile: null,
 
   /* ---------------- utilidades ---------------- */
   esc(s) {
@@ -70,7 +72,10 @@ const App = {
       e.preventDefault();
       this.saveReceipt();
     });
-    document.getElementById('up-file').addEventListener('change', (e) => this.previewFile(e));
+    ['up-file-camera', 'up-file-gallery'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', (e) => this.previewFile(e));
+    });
     document.getElementById('report-client').addEventListener('change', () => this.renderReportSummary());
 
     window.addEventListener('popstate', () => this.hideViewer());
@@ -335,7 +340,10 @@ const App = {
         </div>
         <div class="receipt-side">
           <div class="amt">${this.money(r.amount)}</div>
-          <button class="del" onclick="App.deleteReceipt(${r.id})" title="Eliminar"><i class="fas fa-trash-can"></i></button>
+          <div class="receipt-actions">
+            <button class="mini edit" onclick="App.editReceipt(${r.id})" title="Editar"><i class="fas fa-pen"></i></button>
+            <button class="mini danger" onclick="App.deleteReceipt(${r.id})" title="Eliminar"><i class="fas fa-trash-can"></i></button>
+          </div>
         </div>
       </div>`).join('') : `
       <div class="empty"><i class="fas fa-receipt"></i><h4>Sin comprobantes</h4><p>Usa el botón de cámara para subir el primero.</p></div>`;
@@ -394,11 +402,42 @@ const App = {
       this.nav('clients');
       return;
     }
+    this.editingId = null;
+    this.pendingFile = null;
     document.getElementById('form-upload').reset();
+    document.getElementById('upload-title').textContent = 'Nuevo comprobante';
+    document.getElementById('btn-save-receipt').textContent = 'Guardar comprobante';
     document.getElementById('up-date').value = this.today();
     document.getElementById('file-preview').classList.add('hidden');
-    document.getElementById('file-text').textContent = 'Tomar foto o elegir imagen';
+    document.getElementById('file-preview').src = '';
+    document.getElementById('file-text').textContent = 'Adjunta la foto del baucher';
     if (this.currentClient) document.getElementById('up-client').value = this.currentClient.id;
+    document.getElementById('modal-upload').classList.remove('hidden');
+  },
+
+  editReceipt(id) {
+    const r = this.receipts.find(x => Number(x.id) === Number(id));
+    if (!r) return;
+    this.editingId = r.id;
+    this.pendingFile = null;
+    document.getElementById('form-upload').reset();
+    document.getElementById('upload-title').textContent = 'Editar comprobante';
+    document.getElementById('btn-save-receipt').textContent = 'Guardar cambios';
+    document.getElementById('up-client').value = r.client_id;
+    document.getElementById('up-amount').value = Number(r.amount);
+    document.getElementById('up-date').value = r.receipt_date;
+    document.getElementById('up-method').value = r.method;
+    document.getElementById('up-note').value = r.note || '';
+    const prev = document.getElementById('file-preview');
+    if (r.file_url) {
+      prev.src = r.file_url;
+      prev.classList.remove('hidden');
+      document.getElementById('file-text').textContent = 'Foto actual. Toca Cámara o Galería solo si quieres reemplazarla.';
+    } else {
+      prev.src = '';
+      prev.classList.add('hidden');
+      document.getElementById('file-text').textContent = 'Sin foto. Puedes adjuntar una.';
+    }
     document.getElementById('modal-upload').classList.remove('hidden');
   },
   closeModal(id) {
@@ -408,6 +447,10 @@ const App = {
   previewFile(e) {
     const f = e.target.files[0];
     if (!f) return;
+    this.pendingFile = f;
+    const other = e.target.id === 'up-file-camera' ? 'up-file-gallery' : 'up-file-camera';
+    const o = document.getElementById(other);
+    if (o) o.value = '';
     const img = document.getElementById('file-preview');
     img.src = URL.createObjectURL(f);
     img.classList.remove('hidden');
@@ -433,24 +476,37 @@ const App = {
   async saveReceipt() {
     const form = document.getElementById('form-upload');
     if (!form.checkValidity()) { form.reportValidity(); return; }
+
+    const isEdit = !!this.editingId;
+    if (!isEdit && !this.pendingFile) {
+      this.toast('Adjunta la foto del baucher', 'err');
+      return;
+    }
+
     const btn = document.getElementById('btn-save-receipt');
+    const original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
     const fd = new FormData();
     fd.append('client_id', document.getElementById('up-client').value);
     fd.append('amount', document.getElementById('up-amount').value);
     fd.append('date', document.getElementById('up-date').value);
     fd.append('method', document.getElementById('up-method').value);
     fd.append('note', document.getElementById('up-note').value);
-    fd.append('file', document.getElementById('up-file').files[0]);
+    if (this.pendingFile) fd.append('file', this.pendingFile);
 
-    const r = await this.request('receipts', { method: 'POST', form: true, body: fd });
+    const action = isEdit ? ('update_receipt&id=' + this.editingId) : 'receipts';
+    const r = await this.request(action, { method: 'POST', form: true, body: fd });
+
     btn.disabled = false;
-    btn.innerHTML = 'Guardar comprobante';
+    btn.innerHTML = original;
 
     if (r.success) {
       this.closeModal('modal-upload');
-      this.toast('Comprobante guardado', 'ok');
+      this.toast(isEdit ? 'Comprobante actualizado' : 'Comprobante guardado', 'ok');
+      this.editingId = null;
+      this.pendingFile = null;
       await this.loadAll();
       if (this.currentClient) this.renderReceipts();
     } else {

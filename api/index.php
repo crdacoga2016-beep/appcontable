@@ -127,6 +127,31 @@ switch ($action) {
         }
         break;
 
+    case 'update_receipt':
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) { echo json_encode(['success' => false, 'message' => 'ID inválido']); break; }
+        $filePath = null;
+        if (!empty($_FILES['file']['tmp_name'])) {
+            $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'])) $ext = 'jpg';
+            if (!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR, 0755, true);
+            $name = uniqid('rec_', true) . '.' . $ext;
+            $dest = UPLOAD_DIR . $name;
+            if (move_uploaded_file($_FILES['file']['tmp_name'], $dest)) $filePath = $dest;
+        }
+        $ok = $receipt->updateReceipt(
+            $id,
+            $userId,
+            $_POST['client_id'] ?? null,
+            $_POST['amount'] ?? 0,
+            $_POST['date'] ?? date('Y-m-d'),
+            $_POST['method'] ?? '',
+            $_POST['note'] ?? '',
+            $filePath
+        );
+        echo json_encode(['success' => $ok]);
+        break;
+
     case 'total':
         $clientId = (int)($_GET['client_id'] ?? 0);
         $start = $_GET['start'] ?? null;

@@ -222,3 +222,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary-2);box-shadow
 .viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;cursor:zoom-in;transition:transform .2s ease}
 .viewer img.zoomed{transform:scale(2.2);cursor:zoom-out}
 .viewer-close{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:14px;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:20px;cursor:pointer;z-index:2}
+
+
+/* ---------- ARCHIVO / ACCIONES ---------- */
+.file-actions{display:flex;gap:10px;margin-bottom:10px}
+.btn-soft{background:var(--primary-soft);color:var(--primary);border:1.5px solid #c7d2fe}
+.receipt-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:7px}
+.mini{width:30px;height:30px;border-radius:9px;border:0;background:#f1f5f9;color:var(--muted);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mini.edit{background:#eef2ff;color:#4338ca}
+.mini.danger{background:#fef2f2;color:#dc2626}

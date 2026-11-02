@@ -199,7 +199,7 @@
 <div id="modal-upload" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-head">
-      <h3>Nuevo comprobante</h3>
+      <h3 id="upload-title">Nuevo comprobante</h3>
       <button class="icon-btn ghost" onclick="App.closeModal('modal-upload')"><i class="fas fa-xmark"></i></button>
     </div>
     <form id="form-upload">
@@ -224,12 +224,14 @@
       </div>
       <div class="field">
         <label>Foto del baucher</label>
-        <label class="file-drop" for="up-file">
-          <i class="fas fa-camera-retro"></i>
-          <span id="file-text">Tomar foto o elegir imagen</span>
-          <img id="file-preview" class="file-preview hidden" alt="Vista previa">
-        </label>
-        <input type="file" id="up-file" accept="image/*" capture="environment" class="hidden" required>
+        <div class="file-actions">
+          <button type="button" class="btn btn-soft" onclick="document.getElementById('up-file-camera').click()"><i class="fas fa-camera"></i> Cámara</button>
+          <button type="button" class="btn btn-soft" onclick="document.getElementById('up-file-gallery').click()"><i class="fas fa-images"></i> Galería</button>
+        </div>
+        <img id="file-preview" class="file-preview hidden" alt="Vista previa">
+        <div id="file-text" class="muted small-note"></div>
+        <input type="file" id="up-file-camera" accept="image/*" capture="environment" class="hidden">
+        <input type="file" id="up-file-gallery" accept="image/*" class="hidden">
       </div>
       <div class="field"><label>Nota (opcional)</label><input type="text" id="up-note" placeholder="Ej: pago de octubre"></div>
       <button class="btn btn-primary" type="submit" id="btn-save-receipt">Guardar comprobante</button>

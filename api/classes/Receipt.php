@@ -33,6 +33,29 @@ class Receipt {
         return $stmt->execute([$userId, $clientId, $amount, $date, $method, $note, $filePath]) ? $this->db->lastInsertId() : false;
     }
 
+    public function updateReceipt($id, $userId, $clientId, $amount, $date, $method, $note, $newFile = null) {
+        $stmt = $this->db->prepare("SELECT file_path FROM receipts WHERE id = ? AND user_id = ?");
+        $stmt->execute([$id, $userId]);
+        $row = $stmt->fetch();
+        if (!$row) return false;
+
+        $sql = "UPDATE receipts SET client_id = ?, amount = ?, receipt_date = ?, method = ?, note = ?";
+        $params = [$clientId, $amount, $date, $method, $note];
+        if ($newFile !== null) {
+            $sql .= ", file_path = ?";
+            $params[] = $newFile;
+        }
+        $sql .= " WHERE id = ? AND user_id = ?";
+        $params[] = $id;
+        $params[] = $userId;
+
+        $ok = $this->db->prepare($sql)->execute($params);
+        if ($ok && $newFile !== null && !empty($row['file_path']) && file_exists($row['file_path'])) {
+            @unlink($row['file_path']);
+        }
+        return $ok;
+    }
+
     public function listReceipts($userId, $clientId = null, $start = null, $end = null) {
         $sql = "SELECT r.*, c.name AS client_name FROM receipts r LEFT JOIN clients c ON r.client_id = c.id WHERE r.user_id = ?";
         $params = [$userId];
