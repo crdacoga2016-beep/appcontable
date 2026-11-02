@@ -49,6 +49,7 @@ jobs:
       - name: Build Debug APK
         working-directory: ./app/android
         env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
         run: ./gradlew assembleDebug
