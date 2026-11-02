@@ -28,6 +28,17 @@ jobs:
         working-directory: ./app
         run: npx cap sync android
 
+      - name: Apply app icons
+        run: |
+          for d in app/resources/android/mipmap-*; do
+            name=$(basename "$d")
+            mkdir -p "app/android/app/src/main/res/$name"
+            cp "$d"/* "app/android/app/src/main/res/$name/"
+          done
+          cp app/resources/android/values/ic_launcher_background.xml app/android/app/src/main/res/values/
+          echo "Iconos aplicados:"
+          ls app/android/app/src/main/res/mipmap-xxxhdpi/
+
       - name: Install Android SDK command-line tools
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools

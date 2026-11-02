@@ -16,7 +16,7 @@
 <div id="view-auth" class="auth-view">
   <div class="auth-card">
     <div class="auth-brand">
-      <div class="brand-logo"><i class="fas fa-layer-group"></i></div>
+      <div class="brand-logo"><img src="img/icono.png" alt="AppContable"></div>
       <div>
         <h1>AppContable</h1>
         <p>Control de comprobantes y clientes</p>
@@ -49,7 +49,7 @@
 
   <header class="topbar">
     <div class="topbar-left">
-      <div class="brand-logo small"><i class="fas fa-layer-group"></i></div>
+      <div class="brand-logo small"><img src="img/icono.png" alt="AppContable"></div>
       <div>
         <div class="topbar-title" id="topbar-title">Inicio</div>
         <div class="topbar-sub" id="topbar-sub">—</div>
@@ -235,6 +235,11 @@
       <button class="btn btn-primary" type="submit" id="btn-save-receipt">Guardar comprobante</button>
     </form>
   </div>
+</div>
+
+<div id="viewer" class="viewer hidden" onclick="App.viewerBackdrop(event)">
+  <button class="viewer-close" onclick="App.closeViewer()"><i class="fas fa-xmark"></i></button>
+  <img id="viewer-img" src="" alt="Comprobante" onclick="App.toggleZoom(event)">
 </div>
 
 <div id="toast" class="toast hidden"></div>

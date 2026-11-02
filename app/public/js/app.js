@@ -73,6 +73,8 @@ const App = {
     document.getElementById('up-file').addEventListener('change', (e) => this.previewFile(e));
     document.getElementById('report-client').addEventListener('change', () => this.renderReportSummary());
 
+    window.addEventListener('popstate', () => this.hideViewer());
+
     if (this.token && this.user) {
       this.showApp();
     } else {
@@ -340,7 +342,33 @@ const App = {
   },
 
   viewImage(url) {
-    window.open(url, '_blank');
+    const v = document.getElementById('viewer');
+    const img = document.getElementById('viewer-img');
+    img.classList.remove('zoomed');
+    img.src = url;
+    v.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    if (!(history.state && history.state.viewer)) history.pushState({ viewer: 1 }, '');
+  },
+  closeViewer() {
+    this.hideViewer();
+    if (history.state && history.state.viewer) history.replaceState(null, '');
+  },
+  hideViewer() {
+    const v = document.getElementById('viewer');
+    const img = document.getElementById('viewer-img');
+    if (!v || v.classList.contains('hidden')) return;
+    v.classList.add('hidden');
+    img.classList.remove('zoomed');
+    img.src = '';
+    document.body.style.overflow = '';
+  },
+  viewerBackdrop(e) {
+    if (e.target && e.target.id === 'viewer') this.closeViewer();
+  },
+  toggleZoom(e) {
+    e.stopPropagation();
+    e.target.classList.toggle('zoomed');
   },
 
   async deleteReceipt(id) {
