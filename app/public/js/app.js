@@ -1,4 +1,4 @@
-const API = 'https://lonmar.lat/api'; // <-- CAMBIA esto por tu URL real de Hostinger
+const API = 'https://lonmar.lat/api/index.php';
 
 let monthlyChart = null;
 
@@ -229,7 +229,7 @@ const app = {
   downloadReport(type) {
     const sel = document.getElementById('report-client');
     const clientId = sel.value || '0';
-    window.location.href = API + '?action=report_' + type + '&client_id=' + clientId;
+    window.location.href = API + '?action=report_' + type + '&client_id=' + clientId + '&token=' + encodeURIComponent(this.token);
   }
 };
 

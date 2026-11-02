@@ -39,6 +39,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'init') {
 // Auth middleware
 $headers = getallheaders();
 $token = isset($headers['Authorization']) ? str_replace('Bearer ', '', $headers['Authorization']) : '';
+if (!$token && isset($_GET['token'])) {
+    $token = $_GET['token'];
+}
 $payload = $auth->verifyToken($token);
 $publicActions = ['login', 'register', 'init'];
 $action = $_GET['action'] ?? '';
