@@ -14,7 +14,16 @@ class Receipt {
     }
 
     public function listClients($userId) {
-        $stmt = $this->db->prepare("SELECT * FROM clients WHERE user_id = ? ORDER BY name ASC");
+        $stmt = $this->db->prepare(
+            "SELECT c.id, c.name, c.phone, c.created_at,
+                    COALESCE(SUM(r.amount), 0) AS total,
+                    COUNT(r.id) AS receipts_count
+             FROM clients c
+             LEFT JOIN receipts r ON r.client_id = c.id AND r.user_id = c.user_id
+             WHERE c.user_id = ?
+             GROUP BY c.id, c.name, c.phone, c.created_at
+             ORDER BY c.name ASC"
+        );
         $stmt->execute([$userId]);
         return $stmt->fetchAll();
     }
@@ -37,8 +46,9 @@ class Receipt {
     }
 
     public function totalByClient($userId, $clientId, $start = null, $end = null) {
-        $sql = "SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS cant FROM receipts WHERE user_id = ? AND client_id = ?";
-        $params = [$userId, $clientId];
+        $sql = "SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS cant FROM receipts WHERE user_id = ?";
+        $params = [$userId];
+        if ($clientId) { $sql .= " AND client_id = ?"; $params[] = $clientId; }
         if ($start) { $sql .= " AND receipt_date >= ?"; $params[] = $start; }
         if ($end) { $sql .= " AND receipt_date <= ?"; $params[] = $end; }
         $stmt = $this->db->prepare($sql);
@@ -57,9 +67,8 @@ class Receipt {
         $stmt->execute([$id, $userId]);
         $row = $stmt->fetch();
         if (!$row) return false;
-        if ($row['file_path'] && file_exists($row['file_path'])) unlink($row['file_path']);
+        if (!empty($row['file_path']) && file_exists($row['file_path'])) @unlink($row['file_path']);
         $stmt = $this->db->prepare("DELETE FROM receipts WHERE id = ? AND user_id = ?");
         return $stmt->execute([$id, $userId]);
     }
 }
-?>

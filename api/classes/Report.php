@@ -11,10 +11,6 @@ class Report {
         $this->receipt = $receipt;
     }
 
-    public function getData($userId, $clientId, $start = null, $end = null) {
-        return $this->receipt->listReceipts($userId, $clientId, $start, $end);
-    }
-
     public function exportCsv($userId, $clientId, $start = null, $end = null) {
         $rows = $this->receipt->listReceipts($userId, $clientId, $start, $end);
         $total = $this->receipt->totalByClient($userId, $clientId, $start, $end);
@@ -22,7 +18,7 @@ class Report {
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="reporte_recibos.csv"');
         $out = fopen('php://output', 'w');
-        fputs($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM for Excel
+        fputs($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
         fputcsv($out, ['Fecha', 'Cliente', 'Método', 'Monto (COP)', 'Nota', 'Archivo'], ';');
         foreach ($rows as $r) {
             fputcsv($out, [
@@ -42,40 +38,57 @@ class Report {
     public function exportPdf($userId, $clientId, $start = null, $end = null) {
         $rows = $this->receipt->listReceipts($userId, $clientId, $start, $end);
         $total = $this->receipt->totalByClient($userId, $clientId, $start, $end);
-        $clientName = null;
-        if ($rows) $clientName = $rows[0]['client_name'] ?? 'Sin cliente';
+        $clientName = $rows ? ($rows[0]['client_name'] ?? 'Sin cliente') : 'Sin cliente';
+        if ($clientId && !$rows) {
+            $stmt = $this->db->prepare("SELECT name FROM clients WHERE id = ? AND user_id = ?");
+            $stmt->execute([$clientId, $userId]);
+            $clientName = $stmt->fetchColumn() ?: 'Sin cliente';
+        }
+
+        $fmt = fn($v) => number_format((float)$v, 0, ',', '.');
 
         $pdf = new PdfMaker();
-        $pdf->SetTitle('Reporte de Recibos - ' . ($clientName ?? 'General'));
-        $pdf->AddPage();
-        $pdf->SetFont('Arial', 'B', 16);
-        $pdf->Cell(0, 10, 'Reporte de Comprobantes', 0, 1, 'C');
-        $pdf->SetFont('Arial', '', 10);
-        $pdf->Cell(0, 8, 'Cliente: ' . htmlspecialchars($clientName ?? 'General'), 0, 1);
-        $pdf->Cell(0, 8, 'Periodo: ' . ($start ?: 'inicio') . ' al ' . ($end ?: 'fin'), 0, 1);
-        $pdf->Cell(0, 8, 'Generado: ' . date('d/m/Y H:i'), 0, 1);
-        $pdf->Ln(5);
+        $pdf->addPage();
 
-        $pdf->SetFont('Arial', 'B', 9);
-        $pdf->Cell(30, 8, 'Fecha', 1, 0, 'C');
-        $pdf->Cell(60, 8, 'Cliente', 1, 0, 'C');
-        $pdf->Cell(35, 8, 'Método', 1, 0, 'C');
-        $pdf->Cell(30, 8, 'Monto (COP)', 1, 0, 'C');
-        $pdf->Cell(45, 8, 'Nota', 1, 1, 'C');
+        $pdf->text(40, 55, 18, true, 'Reporte de Comprobantes', 'C', 515);
+        $pdf->text(40, 82, 10, false, 'Cliente: ' . $clientName, 'L', 515);
+        $pdf->text(40, 98, 10, false, 'Periodo: ' . ($start ?: 'inicio') . '  al  ' . ($end ?: 'fin'), 'L', 515);
+        $pdf->text(40, 114, 9, false, 'Generado: ' . date('d/m/Y H:i'), 'L', 515);
 
-        $pdf->SetFont('Arial', '', 9);
+        $cols = [
+            ['Fecha', 40, 70, 'L'],
+            ['Cliente', 110, 150, 'L'],
+            ['Método', 260, 95, 'L'],
+            ['Monto (COP)', 355, 80, 'R'],
+            ['Nota', 435, 120, 'L'],
+        ];
+
+        $y = 140;
+        $rowH = 18;
+        $header = function () use ($pdf, $cols, &$y, $rowH) {
+            $pdf->rect(40, $y, 515, $rowH, true);
+            foreach ($cols as $c) { $pdf->text($c[1] + 4, $y + 12, 9, true, $c[0], $c[3], $c[2]); }
+            $y += $rowH;
+        };
+        $header();
+
         foreach ($rows as $r) {
-            $pdf->Cell(30, 8, htmlspecialchars($r['receipt_date']), 1, 0);
-            $pdf->Cell(60, 8, htmlspecialchars($r['client_name'] ?? '-'), 1, 0);
-            $pdf->Cell(35, 8, htmlspecialchars($r['method']), 1, 0);
-            $pdf->Cell(30, 8, number_format($r['amount'], 0, ',', '.'), 1, 0, 'R');
-            $pdf->Cell(45, 8, htmlspecialchars($r['note'] ?? ''), 1, 1);
+            if ($y > 770) { $pdf->addPage(); $y = 55; $header(); }
+            $pdf->rect(40, $y, 515, $rowH);
+            $pdf->text($cols[0][1] + 4, $y + 12, 9, false, $r['receipt_date'], 'L', $cols[0][2]);
+            $pdf->text($cols[1][1] + 4, $y + 12, 9, false, substr($r['client_name'] ?? '-', 0, 30), 'L', $cols[1][2]);
+            $pdf->text($cols[2][1] + 4, $y + 12, 9, false, substr($r['method'], 0, 22), 'L', $cols[2][2]);
+            $pdf->text($cols[3][1] + 4, $y + 12, 9, false, $fmt($r['amount']), 'R', $cols[3][2]);
+            $pdf->text($cols[4][1] + 4, $y + 12, 9, false, substr($r['note'] ?? '', 0, 24), 'L', $cols[4][2]);
+            $y += $rowH;
         }
-        $pdf->SetFont('Arial', 'B', 9);
-        $pdf->Cell(125, 8, 'TOTAL', 1, 0, 'R');
-        $pdf->Cell(30, 8, number_format($total['total'], 0, ',', '.'), 1, 1, 'R');
 
-        $pdf->Output('D', 'reporte_recibos_' . ($clientId ?: 'general') . '.pdf');
+        $y += 6;
+        $pdf->text(300, $y + 12, 11, true, 'TOTAL:', 'R', 150);
+        $pdf->text(455, $y + 12, 12, true, '$ ' . $fmt($total['total']), 'R', 100);
+
+        $pdf->text(40, 810, 8, false, 'AppContable - ' . count($rows) . ' comprobantes', 'L', 515);
+
+        $pdf->output('D', 'reporte_' . ($clientId ?: 'general') . '.pdf');
     }
 }
-?>

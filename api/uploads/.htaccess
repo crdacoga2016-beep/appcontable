@@ -1,0 +1,7 @@
+# Impide ejecutar PHP dentro de uploads
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|pl|py|cgi|sh)$">
+  Order allow,deny
+  Deny from all
+</FilesMatch>
+Options -Indexes
+AddType text/plain .php .phtml .php3 .php4 .php5 .php7 .phps

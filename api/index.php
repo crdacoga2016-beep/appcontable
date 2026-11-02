@@ -52,6 +52,14 @@ if (!in_array($action, $publicActions) && !$payload) {
 }
 $userId = $payload['user_id'] ?? null;
 
+function withFileUrl($r) {
+    if (!is_array($r)) return $r;
+    $r['file_url'] = !empty($r['file_path'])
+        ? APP_URL . '/uploads/' . rawurlencode(basename($r['file_path']))
+        : null;
+    return $r;
+}
+
 switch ($action) {
     case 'login':
         $data = json_decode(file_get_contents('php://input'), true);
@@ -106,7 +114,7 @@ switch ($action) {
             $clientId = $_GET['client_id'] ?? null;
             $start = $_GET['start'] ?? null;
             $end = $_GET['end'] ?? null;
-            echo json_encode(['success' => true, 'receipts' => $receipt->listReceipts($userId, $clientId, $start, $end)]);
+            echo json_encode(['success' => true, 'receipts' => array_map('withFileUrl', $receipt->listReceipts($userId, $clientId, $start, $end))]);
         }
         break;
 
@@ -115,7 +123,7 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
             echo json_encode(['success' => $receipt->deleteReceipt($id, $userId)]);
         } else {
-            echo json_encode(['success' => true, 'receipt' => $receipt->getReceipt($id, $userId)]);
+            echo json_encode(['success' => true, 'receipt' => withFileUrl($receipt->getReceipt($id, $userId))]);
         }
         break;
 

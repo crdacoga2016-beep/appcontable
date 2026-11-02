@@ -2,237 +2,244 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#4f46e5">
-<title>AppContable - Gestión de Comprobantes</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4338ca">
+<title>AppContable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- ============ LOGIN ============ -->
-<div id="view-login" class="auth-wrap">
+<!-- ================= AUTH ================= -->
+<div id="view-auth" class="auth-view">
   <div class="auth-card">
-    <div class="auth-header">
-      <div class="auth-brand">
-        <div class="logo"><i class="fas fa-chart-pie"></i></div>
-        <div>
-          <h1>AppContable</h1>
-          <p>Sistema de comprobantes y auditoría</p>
-        </div>
+    <div class="auth-brand">
+      <div class="brand-logo"><i class="fas fa-layer-group"></i></div>
+      <div>
+        <h1>AppContable</h1>
+        <p>Control de comprobantes y clientes</p>
       </div>
     </div>
-    <form id="form-login" class="space-y-3">
-      <div class="form-group">
-        <label>Correo electrónico</label>
-        <input type="email" id="login-email" placeholder="tucorreo@ejemplo.com" required>
-      </div>
-      <div class="form-group">
-        <label>Contraseña</label>
-        <input type="password" id="login-password" placeholder="••••••••" required>
-      </div>
-      <button type="submit" class="btn-primary">Ingresar</button>
+
+    <div class="seg-control" id="auth-tabs">
+      <button class="seg-btn active" onclick="App.authTab('login')" id="tab-login">Iniciar sesión</button>
+      <button class="seg-btn" onclick="App.authTab('register')" id="tab-register">Crear cuenta</button>
+    </div>
+
+    <form id="form-login" class="auth-form">
+      <div class="field"><label>Correo</label><input type="email" id="login-email" placeholder="tucorreo@ejemplo.com" required></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="login-password" placeholder="••••••••" required></div>
+      <button class="btn btn-primary" type="submit">Entrar</button>
     </form>
-    <div class="form-footer">
-      <p>¿No tienes cuenta?</p>
-      <a href="#" onclick="showView('view-register')">Crear cuenta ahora</a>
-    </div>
+
+    <form id="form-register" class="auth-form hidden">
+      <div class="field"><label>Nombre completo</label><input type="text" id="reg-name" placeholder="Ruth Albany" required></div>
+      <div class="field"><label>Correo</label><input type="email" id="reg-email" placeholder="tucorreo@ejemplo.com" required></div>
+      <div class="field"><label>Teléfono</label><input type="tel" id="reg-phone" placeholder="300 000 0000"></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="reg-password" placeholder="••••••••" required></div>
+      <button class="btn btn-primary" type="submit">Crear cuenta</button>
+    </form>
   </div>
 </div>
 
-<!-- ============ REGISTER ============ -->
-<div id="view-register" class="hidden auth-wrap">
-  <div class="auth-card">
-    <div class="auth-header">
-      <button onclick="showView('view-login')" class="text-muted-hover" style="background:none;border:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;margin-bottom:1rem;">
-        <i class="fas fa-arrow-left mr-2"></i> Volver
-      </button>
-      <div class="auth-brand" style="margin-top:0.5rem;">
-        <div class="logo"><i class="fas fa-user-plus"></i></div>
-        <div>
-          <h1>Nueva cuenta</h1>
-          <p>Regístrate para empezar</p>
-        </div>
-      </div>
-    </div>
-    <form id="form-register" class="space-y-3">
-      <div class="form-group"><label>Nombre completo</label><input type="text" id="reg-name" placeholder="Ruth Albany" required></div>
-      <div class="form-group"><label>Correo electrónico</label><input type="email" id="reg-email" placeholder="tucorreo@ejemplo.com" required></div>
-      <div class="form-group"><label>Teléfono</label><input type="tel" id="reg-phone" placeholder="+57 300 000 0000"></div>
-      <div class="form-group"><label>Contraseña</label><input type="password" id="reg-password" placeholder="••••••••" required></div>
-      <button type="submit" class="btn-primary">Crear cuenta</button>
-    </form>
-    <div class="form-footer">
-      <p>¿Ya tienes cuenta?</p>
-      <a href="#" onclick="showView('view-login')">Iniciar sesión</a>
-    </div>
-  </div>
-</div>
+<!-- ================= APP ================= -->
+<div id="view-app" class="app-view hidden">
 
-<!-- ============ APP ============ -->
-<div id="view-app" class="hidden">
-
-  <header>
-    <div class="header-top">
-      <div class="app-brand">
-        <div class="logo"><i class="fas fa-wallet"></i></div>
-        <div>
-          <h1 id="app-title">AppContable</h1>
-          <p id="user-greeting">Bienvenido</p>
-        </div>
-      </div>
-      <div class="user-actions">
-        <span id="chip-total" class="chip chip-info" style="font-size:0.85rem;"><i class="fas fa-coins mr-1"></i> $0</span>
-        <button class="btn-outline-light" onclick="app.logout()"><i class="fas fa-sign-out-alt mr-1"></i> Salir</button>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand-logo small"><i class="fas fa-layer-group"></i></div>
+      <div>
+        <div class="topbar-title" id="topbar-title">Inicio</div>
+        <div class="topbar-sub" id="topbar-sub">—</div>
       </div>
     </div>
+    <button class="icon-btn" onclick="App.logout()" title="Salir"><i class="fas fa-arrow-right-from-bracket"></i></button>
   </header>
 
-  <div class="tabs">
-    <button class="tab-btn active" onclick="app.showTab('dashboard')" id="tab-dashboard">
-      <i class="fas fa-th-large mr-2"></i>Dashboard
-    </button>
-    <button class="tab-btn" onclick="app.showTab('clients')" id="tab-clients">
-      <i class="fas fa-users mr-2"></i>Clientes
-    </button>
-    <button class="tab-btn" onclick="app.showTab('upload')" id="tab-upload">
-      <i class="fas fa-cloud-upload-alt mr-2"></i>Subir Comprobante
-    </button>
-    <button class="tab-btn" onclick="app.showTab('reports')" id="tab-reports">
-      <i class="fas fa-file-alt mr-2"></i>Reportes
-    </button>
-  </div>
+  <main class="main">
 
-  <!-- Dashboard -->
-  <div id="tab-dashboard-content" class="dashboard">
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total recibido</div>
-        <div class="stat-value text-success" id="stat-total">$0</div>
+    <!-- DASHBOARD -->
+    <section id="screen-dashboard" class="screen">
+      <div class="kpi-grid">
+        <div class="kpi kpi-primary">
+          <div class="kpi-label">Total recaudado</div>
+          <div class="kpi-value" id="kpi-total">$ 0</div>
+          <div class="kpi-foot" id="kpi-total-sub">0 comprobantes</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Clientes</div>
+          <div class="kpi-value" id="kpi-clients">0</div>
+          <div class="kpi-foot"><i class="fas fa-users"></i> registrados</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Comprobantes registrados</div>
-        <div class="stat-value text-primary" id="stat-count">0</div>
+
+      <div class="card">
+        <div class="card-head"><h3>Recaudo por mes</h3></div>
+        <canvas id="chart-months" height="150"></canvas>
       </div>
-    </div>
 
-    <div class="chart-wrap">
-      <canvas id="chartMonthly" height="120"></canvas>
-    </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>Actividad reciente</h3>
+          <button class="link-btn" onclick="App.nav('clients')">Ver clientes</button>
+        </div>
+        <div id="recent-list" class="list"></div>
+      </div>
+    </section>
 
-    <div class="recent-list">
-      <h3>Últimos comprobantes</h3>
-      <div id="list-recent" class="divide-y divide-gray-100"></div>
-    </div>
-  </div>
+    <!-- CLIENTS -->
+    <section id="screen-clients" class="screen hidden">
+      <div class="search-row">
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input type="text" id="client-search" placeholder="Buscar cliente por nombre o teléfono" oninput="App.renderClients()">
+        </div>
+        <button class="btn btn-primary btn-icon" onclick="App.openClientModal()"><i class="fas fa-plus"></i></button>
+      </div>
+      <div id="clients-list" class="client-list"></div>
+    </section>
 
-  <!-- Clients -->
-  <div id="tab-clients-content" class="hidden page">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="font-bold text-gray-800">Mis Clientes</h3>
-      <button onclick="app.openClientModal()" class="btn-primary" style="width:auto;padding:0.6rem 1rem;font-size:0.85rem;"><i class="fas fa-plus mr-1"></i> Agregar</button>
-    </div>
-    <div id="list-clients" class="divide-y divide-gray-100"></div>
-  </div>
+    <!-- CLIENT DETAIL -->
+    <section id="screen-client" class="screen hidden">
+      <button class="back-btn" onclick="App.nav('clients')"><i class="fas fa-arrow-left"></i> Clientes</button>
 
-  <!-- Upload -->
-  <div id="tab-upload-content" class="hidden page">
-    <div class="form-card">
-      <h3 class="font-bold text-gray-800 mb-4">Nuevo Comprobante</h3>
-      <form id="form-receipt" class="space-y-4">
-        <div class="form-group">
+      <div class="client-hero">
+        <div class="avatar-lg" id="client-avatar">C</div>
+        <div class="client-hero-info">
+          <h2 id="client-name">Cliente</h2>
+          <p id="client-phone">—</p>
+        </div>
+      </div>
+
+      <div class="kpi-grid two">
+        <div class="kpi kpi-primary">
+          <div class="kpi-label">Total cliente</div>
+          <div class="kpi-value" id="client-total">$ 0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Comprobantes</div>
+          <div class="kpi-value" id="client-count">0</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="chips" id="quick-chips">
+          <button class="chip active" onclick="App.quickFilter('all', this)">Todo</button>
+          <button class="chip" onclick="App.quickFilter('today', this)">Hoy</button>
+          <button class="chip" onclick="App.quickFilter('week', this)">7 días</button>
+          <button class="chip" onclick="App.quickFilter('month', this)">Este mes</button>
+        </div>
+        <div class="date-row">
+          <div class="field compact"><label>Desde</label><input type="date" id="filter-start" onchange="App.applyDateFilter()"></div>
+          <div class="field compact"><label>Hasta</label><input type="date" id="filter-end" onchange="App.applyDateFilter()"></div>
+          <button class="icon-btn ghost" onclick="App.clearFilters()" title="Limpiar"><i class="fas fa-eraser"></i></button>
+        </div>
+        <div class="search-box small">
+          <i class="fas fa-magnifying-glass"></i>
+          <input type="text" id="receipt-search" placeholder="Buscar por fecha, método o nota" oninput="App.renderReceipts()">
+        </div>
+      </div>
+
+      <div id="receipts-list" class="receipt-list"></div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="screen-reports" class="screen hidden">
+      <div class="card">
+        <div class="card-head"><h3>Generar reporte</h3></div>
+        <div class="field">
           <label>Cliente</label>
-          <select id="receipt-client" required>
-            <option value="">Seleccionar cliente</option>
-          </select>
+          <select id="report-client"></select>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-group">
-            <label>Método de pago</label>
-            <select id="receipt-method" required>
-              <option value="">Seleccionar método</option>
-              <option value="Nequi (envío a banco)">Nequi (envío a banco)</option>
-              <option value="Transferencia">Transferencia Bancaria</option>
-              <option value="Consignación">Consignación</option>
-              <option value="Depósito">Depósito</option>
-              <option value="Recarga Nequi">Recarga Nequi</option>
-              <option value="Transferencia (SMS)">Transferencia (SMS)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Monto (COP)</label>
-            <input type="number" id="receipt-amount" required placeholder="0" min="0">
-          </div>
+        <div class="date-row">
+          <div class="field compact"><label>Desde</label><input type="date" id="report-start"></div>
+          <div class="field compact"><label>Hasta</label><input type="date" id="report-end"></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-group">
-            <label>Fecha del comprobante</label>
-            <input type="date" id="receipt-date" required>
-          </div>
-          <div class="form-group">
-            <label>Foto del baucher</label>
-            <input type="file" id="receipt-file" accept="image/*" capture="environment" required>
-          </div>
+        <div class="report-buttons">
+          <button class="btn btn-pdf" onclick="App.downloadReport('pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+          <button class="btn btn-excel" onclick="App.downloadReport('excel')"><i class="fas fa-file-excel"></i> Excel</button>
         </div>
-        <div class="form-group">
-          <label>Nota (opcional)</label>
-          <textarea id="receipt-note" rows="2" placeholder="Ej: Pago consulta octubre"></textarea>
-        </div>
-        <button type="submit" class="btn-primary">Guardar Comprobante</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Reports -->
-  <div id="tab-reports-content" class="hidden page">
-    <h3 class="font-bold text-gray-800 mb-4">Reportes y Auditoría</h3>
-    <div class="report-card">
-      <div class="form-group">
-        <label>Filtrar por cliente</label>
-        <select id="report-client">
-          <option value="0">Todos los clientes</option>
-        </select>
+        <p class="muted small-note">Se descarga en tu celular y lo puedes compartir o abrir con Excel.</p>
       </div>
-      <div class="report-actions">
-        <button class="btn pdf" onclick="app.downloadReport('pdf')"><i class="fas fa-file-pdf"></i> Descargar PDF</button>
-        <button class="btn excel" onclick="app.downloadReport('excel')"><i class="fas fa-file-excel"></i> Descargar Excel</button>
+      <div class="card">
+        <div class="card-head"><h3>Resumen rápido</h3></div>
+        <div id="report-summary" class="report-summary">Selecciona un cliente para ver el resumen.</div>
       </div>
-      <p class="text-muted" style="font-size:0.8rem; margin-top:0.5rem;">Los archivos se descargan directamente en tu celular.</p>
-    </div>
-  </div>
+    </section>
 
-  <!-- Receipts list embedded -->
-  <div id="tab-receipts-list-content" class="hidden page">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="font-bold text-gray-800">Todos los Comprobantes</h3>
-      <button onclick="app.showTab('dashboard')" class="text-muted-hover" style="background:none;border:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;">
-        <i class="fas fa-arrow-left mr-1"></i> Volver al Dashboard
-      </button>
-    </div>
-    <div id="list-receipts" class="divide-y divide-gray-100"></div>
-  </div>
+  </main>
 
-  <!-- Client Modal -->
-  <div id="modal-client" class="modal-overlay hidden">
-    <div class="modal">
-      <button class="modal-close" onclick="app.closeClientModal()">&times;</button>
-      <h3>Nuevo Cliente</h3>
-      <form id="form-client" class="space-y-3">
-        <div class="form-group"><label>Nombre</label><input type="text" id="client-name" required placeholder="Ej: Juan Pérez"></div>
-        <div class="form-group"><label>Teléfono</label><input type="tel" id="client-phone" placeholder="+57 300 000 0000"></div>
-        <div class="btn-row">
-          <button type="button" onclick="app.closeClientModal()" class="btn-secondary">Cancelar</button>
-          <button type="submit" class="btn-primary">Guardar Cliente</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <nav class="tabbar">
+    <button class="tab active" data-tab="dashboard" onclick="App.nav('dashboard')"><i class="fas fa-house"></i><span>Inicio</span></button>
+    <button class="tab" data-tab="clients" onclick="App.nav('clients')"><i class="fas fa-users"></i><span>Clientes</span></button>
+    <button class="tab" data-tab="reports" onclick="App.nav('reports')"><i class="fas fa-chart-simple"></i><span>Reportes</span></button>
+  </nav>
 
+  <button class="fab hidden" id="fab-upload" onclick="App.openUploadModal()"><i class="fas fa-camera"></i></button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-<script type="module" src="js/app.js"></script>
+<!-- ================= MODAL CLIENTE ================= -->
+<div id="modal-client" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Nuevo cliente</h3>
+      <button class="icon-btn ghost" onclick="App.closeModal('modal-client')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form id="form-client">
+      <div class="field"><label>Nombre</label><input type="text" id="client-name-input" placeholder="Ej: María Gómez" required></div>
+      <div class="field"><label>Teléfono</label><input type="tel" id="client-phone-input" placeholder="300 000 0000"></div>
+      <button class="btn btn-primary" type="submit">Guardar cliente</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL COMPROBANTE ================= -->
+<div id="modal-upload" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Nuevo comprobante</h3>
+      <button class="icon-btn ghost" onclick="App.closeModal('modal-upload')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form id="form-upload">
+      <div class="field">
+        <label>Cliente</label>
+        <select id="up-client" required></select>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>Monto (COP)</label><input type="number" id="up-amount" min="0" step="1" placeholder="0" required></div>
+        <div class="field"><label>Fecha</label><input type="date" id="up-date" required></div>
+      </div>
+      <div class="field">
+        <label>Método de pago</label>
+        <select id="up-method" required>
+          <option value="Nequi (envío a banco)">Nequi (envío a banco)</option>
+          <option value="Transferencia">Transferencia bancaria</option>
+          <option value="Consignación">Consignación</option>
+          <option value="Depósito">Depósito</option>
+          <option value="Recarga Nequi">Recarga Nequi</option>
+          <option value="Transferencia (SMS)">Transferencia (SMS)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Foto del baucher</label>
+        <label class="file-drop" for="up-file">
+          <i class="fas fa-camera-retro"></i>
+          <span id="file-text">Tomar foto o elegir imagen</span>
+          <img id="file-preview" class="file-preview hidden" alt="Vista previa">
+        </label>
+        <input type="file" id="up-file" accept="image/*" capture="environment" class="hidden" required>
+      </div>
+      <div class="field"><label>Nota (opcional)</label><input type="text" id="up-note" placeholder="Ej: pago de octubre"></div>
+      <button class="btn btn-primary" type="submit" id="btn-save-receipt">Guardar comprobante</button>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

@@ -1,238 +1,463 @@
 const API = 'https://lonmar.lat/api/index.php';
 
-let monthlyChart = null;
-
-const app = {
+const App = {
   token: localStorage.getItem('token') || '',
   user: JSON.parse(localStorage.getItem('user') || 'null'),
+  clients: [],
+  receipts: [],
+  currentClient: null,
+  filter: { start: '', end: '', text: '' },
+  chart: null,
 
-  init() {
-    if (this.token && this.user) {
-      this.showView('view-app');
-      this.loadDashboard();
-    } else {
-      this.showView('view-login');
-    }
-
-    document.getElementById('form-login').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.login(document.getElementById('login-email').value, document.getElementById('login-password').value);
-    });
-
-    document.getElementById('form-register').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.register(
-        document.getElementById('reg-name').value,
-        document.getElementById('reg-email').value,
-        document.getElementById('reg-phone').value,
-        document.getElementById('reg-password').value
-      );
-    });
-
-    document.getElementById('form-receipt').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.saveReceipt();
-    });
-
-    document.getElementById('form-client').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.saveClient();
-    });
+  /* ---------------- utilidades ---------------- */
+  esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
+  money(n) {
+    return '$ ' + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+  },
+  today() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  },
+  toast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + (type || '');
+    clearTimeout(this._toastT);
+    this._toastT = setTimeout(() => t.classList.add('hidden'), 2600);
   },
 
-  async api(action, method = 'GET', body = null, isForm = false) {
+  async request(action, opts) {
+    opts = opts || {};
     const headers = {};
-    if (!isForm && body) headers['Content-Type'] = 'application/json';
+    if (!opts.form && opts.body) headers['Content-Type'] = 'application/json';
     if (this.token) headers['Authorization'] = 'Bearer ' + this.token;
-    const url = API + '?action=' + action;
     try {
-      const res = await fetch(url, { method, headers, body: isForm ? body : (body ? JSON.stringify(body) : null) });
-      return await res.json();
+      const res = await fetch(API + '?action=' + action, {
+        method: opts.method || 'GET',
+        headers,
+        body: opts.form ? opts.body : (opts.body ? JSON.stringify(opts.body) : null)
+      });
+      const data = await res.json();
+      if (data && data.success === false && /token/i.test(data.message || '')) {
+        this.logout();
+      }
+      return data;
     } catch (e) {
-      alert('Error de conexión: ' + e.message);
+      this.toast('Sin conexión con el servidor', 'err');
       return { success: false };
     }
   },
 
+  /* ---------------- auth ---------------- */
+  init() {
+    document.getElementById('form-login').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.login(document.getElementById('login-email').value.trim(), document.getElementById('login-password').value);
+    });
+    document.getElementById('form-register').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.register();
+    });
+    document.getElementById('form-client').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveClient();
+    });
+    document.getElementById('form-upload').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveReceipt();
+    });
+    document.getElementById('up-file').addEventListener('change', (e) => this.previewFile(e));
+    document.getElementById('report-client').addEventListener('change', () => this.renderReportSummary());
+
+    if (this.token && this.user) {
+      this.showApp();
+    } else {
+      document.getElementById('view-auth').classList.remove('hidden');
+    }
+  },
+
+  authTab(which) {
+    document.getElementById('tab-login').classList.toggle('active', which === 'login');
+    document.getElementById('tab-register').classList.toggle('active', which === 'register');
+    document.getElementById('form-login').classList.toggle('hidden', which !== 'login');
+    document.getElementById('form-register').classList.toggle('hidden', which !== 'register');
+  },
+
   async login(email, password) {
-    const r = await this.api('login', 'POST', { email, password });
+    const r = await this.request('login', { method: 'POST', body: { email, password } });
     if (r.success) {
       this.token = r.token;
       this.user = r.user;
       localStorage.setItem('token', r.token);
       localStorage.setItem('user', JSON.stringify(r.user));
-      this.showView('view-app');
-      this.loadDashboard();
+      this.showApp();
     } else {
-      alert(r.message || 'Error al iniciar sesión');
+      this.toast(r.message || 'No se pudo iniciar sesión', 'err');
     }
   },
 
-  async register(name, email, phone, password) {
-    const r = await this.api('register', 'POST', { name, email, phone, password });
-    alert(r.message || 'Cuenta creada');
-    if (r.success) this.showView('view-login');
+  async register() {
+    const body = {
+      name: document.getElementById('reg-name').value.trim(),
+      email: document.getElementById('reg-email').value.trim(),
+      phone: document.getElementById('reg-phone').value.trim(),
+      password: document.getElementById('reg-password').value
+    };
+    const r = await this.request('register', { method: 'POST', body });
+    if (r.success) {
+      this.toast('Cuenta creada, ya puedes entrar', 'ok');
+      this.authTab('login');
+      document.getElementById('login-email').value = body.email;
+    } else {
+      this.toast(r.message || 'No se pudo crear la cuenta', 'err');
+    }
   },
 
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    this.token = '';
+    this.user = null;
     location.reload();
   },
 
-  showView(id) {
-    document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
+  showApp() {
+    document.getElementById('view-auth').classList.add('hidden');
+    document.getElementById('view-app').classList.remove('hidden');
+    document.getElementById('topbar-sub').textContent = this.user ? this.user.name : '';
+    this.nav('dashboard');
+    this.loadAll();
   },
 
-  showTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('[id$="-content"]').forEach(el => el.classList.add('hidden'));
-    document.getElementById('tab-' + tab).classList.add('active');
-    const content = document.getElementById(tab + '-content');
-    if (content) content.classList.remove('hidden');
-    if (tab === 'dashboard') this.loadDashboard();
-    if (tab === 'clients') { this.loadClients(); this.loadClientSelect('report-client'); }
-    if (tab === 'upload') this.loadClientSelect('receipt-client');
-    if (tab === 'receipts-list') this.loadReceiptsList();
+  /* ---------------- navegación ---------------- */
+  nav(screen) {
+    ['dashboard', 'clients', 'client', 'reports'].forEach(s => {
+      const el = document.getElementById('screen-' + s);
+      if (el) el.classList.toggle('hidden', s !== screen);
+    });
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === screen));
+    const titles = { dashboard: 'Inicio', clients: 'Clientes', client: 'Cliente', reports: 'Reportes' };
+    document.getElementById('topbar-title').textContent = titles[screen] || 'AppContable';
+    document.getElementById('fab-upload').classList.toggle('hidden', screen !== 'client');
+    if (screen === 'clients') this.renderClients();
+    if (screen === 'reports') this.renderReportSummary();
+    window.scrollTo(0, 0);
   },
 
-  money(n) {
-    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+  /* ---------------- datos ---------------- */
+  async loadAll() {
+    const [c, r] = await Promise.all([this.request('clients'), this.request('receipts')]);
+    this.clients = (c && c.clients) || [];
+    this.receipts = (r && r.receipts) || [];
+    this.renderDashboard();
+    this.renderClients();
+    this.fillClientSelects();
   },
 
-  async loadDashboard() {
-    const r = await this.api('receipts');
-    const list = r.receipts || [];
-    const total = list.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
-    document.getElementById('stat-total').textContent = this.money(total);
-    document.getElementById('stat-count').textContent = list.length;
-    document.getElementById('chip-total').innerHTML = '<i class="fas fa-coins mr-1"></i> ' + this.money(total);
-    document.getElementById('user-greeting').textContent = 'Bienvenido, ' + (this.user.name || '');
-    document.getElementById('app-title').textContent = 'AppContable';
+  renderDashboard() {
+    const total = this.receipts.reduce((s, x) => s + Number(x.amount || 0), 0);
+    document.getElementById('kpi-total').textContent = this.money(total);
+    document.getElementById('kpi-total-sub').textContent = this.receipts.length + ' comprobantes';
+    document.getElementById('kpi-clients').textContent = this.clients.length;
 
-    // Por mes
+    const recent = this.receipts.slice(0, 6);
+    const el = document.getElementById('recent-list');
+    el.innerHTML = recent.length ? recent.map(x => `
+      <div class="row">
+        <div class="avatar">${this.esc((x.client_name || '?').charAt(0).toUpperCase())}</div>
+        <div class="row-main">
+          <div class="row-title">${this.esc(x.client_name || 'Sin cliente')}</div>
+          <div class="row-sub">${this.esc(x.receipt_date)} · ${this.esc(x.method)}</div>
+        </div>
+        <div class="row-amount">${this.money(x.amount)}<small>COP</small></div>
+      </div>`).join('') : `
+      <div class="empty"><i class="fas fa-inbox"></i><h4>Sin movimientos</h4><p>Sube tu primer comprobante desde un cliente.</p></div>`;
+
+    this.renderChart();
+  },
+
+  renderChart() {
     const byMonth = {};
-    list.forEach(x => {
+    this.receipts.forEach(x => {
       const m = (x.receipt_date || '').slice(0, 7);
-      byMonth[m] = (byMonth[m] || 0) + parseFloat(x.amount || 0);
+      if (!m) return;
+      byMonth[m] = (byMonth[m] || 0) + Number(x.amount || 0);
     });
     const labels = Object.keys(byMonth).sort();
     const data = labels.map(l => byMonth[l]);
-
-    const ctx = document.getElementById('chartMonthly');
-    if (monthlyChart) monthlyChart.destroy();
-    monthlyChart = new Chart(ctx, {
+    const ctx = document.getElementById('chart-months');
+    if (!ctx || typeof Chart === 'undefined') return;
+    if (this.chart) this.chart.destroy();
+    this.chart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: labels.map(l => l.replace('2026-', '')),
+        labels: labels.map(l => l.slice(5) + '/' + l.slice(2, 4)),
         datasets: [{
-          label: 'Recibidos por mes (COP)',
-          data: data,
-          backgroundColor: 'rgba(79, 70, 229, 0.7)',
-          borderColor: '#4f46e5',
-          borderWidth: 1,
-          borderRadius: 4
+          data,
+          backgroundColor: 'rgba(99,102,241,.75)',
+          hoverBackgroundColor: '#4338ca',
+          borderRadius: 6,
+          maxBarThickness: 34
         }]
       },
       options: {
         responsive: true,
-        plugins: { legend: { display: false }, title: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString('es-CO') } } }
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => this.money(c.raw) } } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => (v >= 1000000 ? (v / 1000000) + 'M' : (v / 1000) + 'k'), font: { size: 10 } } },
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+        }
       }
     });
+  },
 
-    const recent = list.slice(0, 6);
-    const html = recent.map(x => `
-      <div class="receipt-row">
-        <div class="receipt-info">
-          <div class="client">${x.client_name || 'Sin cliente'}</div>
-          <div class="meta">${x.receipt_date} • ${x.method}</div>
+  renderClients() {
+    const q = (document.getElementById('client-search').value || '').toLowerCase().trim();
+    const list = this.clients.filter(c =>
+      !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)
+    );
+    const el = document.getElementById('clients-list');
+    el.innerHTML = list.length ? list.map(c => {
+      const mine = this.receipts.filter(r => Number(r.client_id) === Number(c.id));
+      const total = c.total != null ? Number(c.total) : mine.reduce((s, x) => s + Number(x.amount || 0), 0);
+      const count = c.receipts_count != null ? c.receipts_count : mine.length;
+      return `
+      <div class="client-card" onclick="App.openClient(${c.id})">
+        <div class="avatar">${this.esc((c.name || '?').charAt(0).toUpperCase())}</div>
+        <div class="client-info">
+          <h4>${this.esc(c.name)}</h4>
+          <p>${this.esc(c.phone || 'Sin teléfono')}</p>
         </div>
-        <div class="receipt-amount">${parseFloat(x.amount).toLocaleString('es-CO')} <small>COP</small></div>
-      </div>
-    `).join('') || '<div class="empty-state"><i class="fas fa-inbox"></i><h3>Sin comprobantes</h3><p>Empieza subiendo tu primer comprobante.</p></div>';
-    document.getElementById('list-recent').innerHTML = html;
-  },
-
-  async loadClients() {
-    const r = await this.api('clients');
-    const list = r.clients || [];
-    const html = list.map(c => `
-      <div class="receipt-row" style="padding:1rem 0;">
-        <div class="receipt-info">
-          <div class="client">${c.name}</div>
-          <div class="meta">${c.phone || 'Sin teléfono'} • ID ${c.id}</div>
+        <div class="client-total">
+          <div class="amount">${this.money(total)}</div>
+          <div class="count">${count} compr.</div>
         </div>
-      </div>
-    `).join('') || '<div class="empty-state"><i class="fas fa-users"></i><h3>Sin clientes</h3><p>Agrega tu primer cliente para organizar los recibos.</p></div>';
-    document.getElementById('list-clients').innerHTML = html;
+      </div>`;
+    }).join('') : `
+      <div class="empty"><i class="fas fa-user-plus"></i><h4>${q ? 'Sin resultados' : 'Aún no hay clientes'}</h4><p>${q ? 'Prueba con otro nombre.' : 'Crea tu primer cliente con el botón +.'}</p></div>`;
   },
 
-  async loadClientSelect(selectId) {
-    const r = await this.api('clients');
-    const list = r.clients || [];
-    const sel = document.getElementById(selectId);
-    sel.innerHTML = '<option value="">Seleccionar cliente</option>' + list.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  fillClientSelects() {
+    const opts = this.clients.map(c => `<option value="${c.id}">${this.esc(c.name)}</option>`).join('');
+    const up = document.getElementById('up-client');
+    const rep = document.getElementById('report-client');
+    if (up) up.innerHTML = opts || '<option value="">Crea un cliente primero</option>';
+    if (rep) rep.innerHTML = '<option value="0">Todos los clientes</option>' + opts;
   },
 
-  async loadReceiptsList() {
-    const r = await this.api('receipts');
-    const list = r.receipts || [];
-    const html = list.map(x => `
-      <div class="receipt-row" style="padding:1rem 0;">
-        <div class="receipt-info">
-          <div class="client">${x.client_name || 'Sin cliente'}</div>
-          <div class="meta">${x.receipt_date} • ${x.method}</div>
+  /* ---------------- cliente ---------------- */
+  openClient(id) {
+    const c = this.clients.find(x => Number(x.id) === Number(id));
+    if (!c) return;
+    this.currentClient = c;
+    this.filter = { start: '', end: '', text: '' };
+    document.getElementById('client-avatar').textContent = (c.name || '?').charAt(0).toUpperCase();
+    document.getElementById('client-name').textContent = c.name;
+    document.getElementById('client-phone').textContent = c.phone || 'Sin teléfono';
+    document.getElementById('filter-start').value = '';
+    document.getElementById('filter-end').value = '';
+    document.getElementById('receipt-search').value = '';
+    document.querySelectorAll('#quick-chips .chip').forEach((b, i) => b.classList.toggle('active', i === 0));
+    this.nav('client');
+    this.renderReceipts();
+  },
+
+  clientReceipts() {
+    if (!this.currentClient) return [];
+    return this.receipts.filter(r => Number(r.client_id) === Number(this.currentClient.id));
+  },
+
+  quickFilter(kind, btn) {
+    document.querySelectorAll('#quick-chips .chip').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const d = new Date();
+    const iso = (dt) => dt.toISOString().slice(0, 10);
+    let start = '', end = '';
+    if (kind === 'today') { start = end = iso(d); }
+    if (kind === 'week') { const s = new Date(d); s.setDate(s.getDate() - 6); start = iso(s); end = iso(d); }
+    if (kind === 'month') { start = iso(new Date(d.getFullYear(), d.getMonth(), 1)); end = iso(d); }
+    this.filter.start = start;
+    this.filter.end = end;
+    document.getElementById('filter-start').value = start;
+    document.getElementById('filter-end').value = end;
+    this.renderReceipts();
+  },
+
+  applyDateFilter() {
+    this.filter.start = document.getElementById('filter-start').value;
+    this.filter.end = document.getElementById('filter-end').value;
+    document.querySelectorAll('#quick-chips .chip').forEach(b => b.classList.remove('active'));
+    this.renderReceipts();
+  },
+
+  clearFilters() {
+    this.filter = { start: '', end: '', text: '' };
+    document.getElementById('filter-start').value = '';
+    document.getElementById('filter-end').value = '';
+    document.getElementById('receipt-search').value = '';
+    document.querySelectorAll('#quick-chips .chip').forEach((b, i) => b.classList.toggle('active', i === 0));
+    this.renderReceipts();
+  },
+
+  renderReceipts() {
+    const text = (document.getElementById('receipt-search').value || '').toLowerCase().trim();
+    let list = this.clientReceipts();
+    if (this.filter.start) list = list.filter(r => r.receipt_date >= this.filter.start);
+    if (this.filter.end) list = list.filter(r => r.receipt_date <= this.filter.end);
+    if (text) list = list.filter(r =>
+      (r.receipt_date || '').includes(text) ||
+      (r.method || '').toLowerCase().includes(text) ||
+      (r.note || '').toLowerCase().includes(text) ||
+      String(r.amount).includes(text)
+    );
+
+    const total = list.reduce((s, x) => s + Number(x.amount || 0), 0);
+    document.getElementById('client-total').textContent = this.money(total);
+    document.getElementById('client-count').textContent = list.length;
+
+    const el = document.getElementById('receipts-list');
+    el.innerHTML = list.length ? list.map(r => `
+      <div class="receipt-card">
+        ${r.file_url
+          ? `<img class="thumb" src="${this.esc(r.file_url)}" alt="comprobante" loading="lazy" onclick="App.viewImage('${this.esc(r.file_url)}')">`
+          : `<div class="thumb-ph"><i class="fas fa-image"></i></div>`}
+        <div class="receipt-main">
+          <div class="t">${this.money(r.amount)} COP</div>
+          <div class="s">${this.esc(r.receipt_date)}</div>
+          <span class="badge">${this.esc(r.method)}</span>
+          ${r.note ? `<div class="s" style="margin-top:3px">${this.esc(r.note)}</div>` : ''}
         </div>
-        <div class="receipt-amount">${parseFloat(x.amount).toLocaleString('es-CO')} <small>COP</small></div>
-      </div>
-    `).join('') || '<div class="empty-state"><i class="fas fa-inbox"></i><h3>Sin comprobantes</h3></div>';
-    document.getElementById('list-receipts').innerHTML = html;
+        <div class="receipt-side">
+          <div class="amt">${this.money(r.amount)}</div>
+          <button class="del" onclick="App.deleteReceipt(${r.id})" title="Eliminar"><i class="fas fa-trash-can"></i></button>
+        </div>
+      </div>`).join('') : `
+      <div class="empty"><i class="fas fa-receipt"></i><h4>Sin comprobantes</h4><p>Usa el botón de cámara para subir el primero.</p></div>`;
   },
 
+  viewImage(url) {
+    window.open(url, '_blank');
+  },
+
+  async deleteReceipt(id) {
+    if (!confirm('¿Eliminar este comprobante? Esta acción no se puede deshacer.')) return;
+    const r = await this.request('receipt&id=' + id, { method: 'DELETE' });
+    if (r.success) {
+      this.toast('Comprobante eliminado', 'ok');
+      await this.loadAll();
+      this.renderReceipts();
+    } else {
+      this.toast('No se pudo eliminar', 'err');
+    }
+  },
+
+  /* ---------------- modales ---------------- */
   openClientModal() {
     document.getElementById('modal-client').classList.remove('hidden');
+    setTimeout(() => document.getElementById('client-name-input').focus(), 120);
   },
-  closeClientModal() {
-    document.getElementById('modal-client').classList.add('hidden');
+  openUploadModal() {
+    if (!this.clients.length) {
+      this.toast('Primero crea un cliente', 'err');
+      this.nav('clients');
+      return;
+    }
+    document.getElementById('form-upload').reset();
+    document.getElementById('up-date').value = this.today();
+    document.getElementById('file-preview').classList.add('hidden');
+    document.getElementById('file-text').textContent = 'Tomar foto o elegir imagen';
+    if (this.currentClient) document.getElementById('up-client').value = this.currentClient.id;
+    document.getElementById('modal-upload').classList.remove('hidden');
+  },
+  closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+  },
+
+  previewFile(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const img = document.getElementById('file-preview');
+    img.src = URL.createObjectURL(f);
+    img.classList.remove('hidden');
+    document.getElementById('file-text').textContent = f.name;
   },
 
   async saveClient() {
-    const name = document.getElementById('client-name').value.trim();
-    const phone = document.getElementById('client-phone').value.trim();
-    if (!name) return alert('Ingresa el nombre');
-    const r = await this.api('clients', 'POST', { name, phone });
+    const name = document.getElementById('client-name-input').value.trim();
+    const phone = document.getElementById('client-phone-input').value.trim();
+    if (!name) return this.toast('Escribe el nombre', 'err');
+    const r = await this.request('clients', { method: 'POST', body: { name, phone } });
     if (r.success) {
-      this.closeClientModal();
-      document.getElementById('client-name').value = '';
-      document.getElementById('client-phone').value = '';
-      this.loadClients();
-      this.loadClientSelect('receipt-client');
-      this.loadClientSelect('report-client');
-    } else alert(r.message || 'Error al guardar cliente');
+      this.closeModal('modal-client');
+      document.getElementById('form-client').reset();
+      this.toast('Cliente creado', 'ok');
+      await this.loadAll();
+      this.renderClients();
+    } else {
+      this.toast(r.message || 'No se pudo crear', 'err');
+    }
   },
 
   async saveReceipt() {
-    const form = document.getElementById('form-receipt');
+    const form = document.getElementById('form-upload');
     if (!form.checkValidity()) { form.reportValidity(); return; }
-    const fd = new FormData(form);
-    const r = await this.api('receipts', 'POST', fd, true);
+    const btn = document.getElementById('btn-save-receipt');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    const fd = new FormData();
+    fd.append('client_id', document.getElementById('up-client').value);
+    fd.append('amount', document.getElementById('up-amount').value);
+    fd.append('date', document.getElementById('up-date').value);
+    fd.append('method', document.getElementById('up-method').value);
+    fd.append('note', document.getElementById('up-note').value);
+    fd.append('file', document.getElementById('up-file').files[0]);
+
+    const r = await this.request('receipts', { method: 'POST', form: true, body: fd });
+    btn.disabled = false;
+    btn.innerHTML = 'Guardar comprobante';
+
     if (r.success) {
-      form.reset();
-      document.getElementById('receipt-date').value = new Date().toISOString().split('T')[0];
-      this.loadDashboard();
-      this.showTab('dashboard');
-    } else alert(r.message || 'Error al guardar comprobante');
+      this.closeModal('modal-upload');
+      this.toast('Comprobante guardado', 'ok');
+      await this.loadAll();
+      if (this.currentClient) this.renderReceipts();
+    } else {
+      this.toast(r.message || 'No se pudo guardar', 'err');
+    }
+  },
+
+  /* ---------------- reportes ---------------- */
+  renderReportSummary() {
+    const sel = document.getElementById('report-client');
+    if (!sel) return;
+    const id = Number(sel.value || 0);
+    const start = document.getElementById('report-start').value;
+    const end = document.getElementById('report-end').value;
+    let list = this.receipts;
+    if (id) list = list.filter(r => Number(r.client_id) === id);
+    if (start) list = list.filter(r => r.receipt_date >= start);
+    if (end) list = list.filter(r => r.receipt_date <= end);
+    const total = list.reduce((s, x) => s + Number(x.amount || 0), 0);
+    const name = id ? (this.clients.find(c => Number(c.id) === id) || {}).name : 'Todos los clientes';
+    document.getElementById('report-summary').innerHTML =
+      `${this.esc(name || '')}<strong>${this.money(total)}</strong>${list.length} comprobantes en el periodo`;
   },
 
   downloadReport(type) {
-    const sel = document.getElementById('report-client');
-    const clientId = sel.value || '0';
-    window.location.href = API + '?action=report_' + type + '&client_id=' + clientId + '&token=' + encodeURIComponent(this.token);
+    const id = document.getElementById('report-client').value || '0';
+    const start = document.getElementById('report-start').value;
+    const end = document.getElementById('report-end').value;
+    let url = API + '?action=report_' + type + '&client_id=' + id + '&token=' + encodeURIComponent(this.token);
+    if (start) url += '&start=' + start;
+    if (end) url += '&end=' + end;
+    window.location.href = url;
+    this.toast('Generando ' + (type === 'pdf' ? 'PDF' : 'Excel') + '...', 'ok');
   }
 };
 
-function showView(id) { app.showView(id); }
-
-app.init();
+window.App = App;
+document.addEventListener('DOMContentLoaded', () => App.init());
