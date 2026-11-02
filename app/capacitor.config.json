@@ -1,9 +1,17 @@
 {
-  "appId": "com.recibos.app",
-  "appName": "Recibos App",
+  "appId": "com.appcontable.app",
+  "appName": "AppContable",
   "webDir": "public",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "Camera": {
+      "preview": true,
+      "allowEditing": false,
+      "quality": 80
+    }
   }
 }

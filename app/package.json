@@ -1,11 +1,12 @@
 {
-  "name": "recibos-app",
+  "name": "appcontable",
   "version": "1.0.0",
-  "description": "App de registro de comprobantes",
+  "description": "App de registro de comprobantes y auditoría",
   "main": "index.js",
   "scripts": {},
   "dependencies": {
     "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0"
   }
 }
