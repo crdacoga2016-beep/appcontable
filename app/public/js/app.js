@@ -1,4 +1,4 @@
-const API = 'https://tu-dominio.com/api'; // <-- CAMBIA esto por tu URL real de Hostinger
+const API = 'https://lonmar.lat/api'; // <-- CAMBIA esto por tu URL real de Hostinger
 
 let monthlyChart = null;
 
