@@ -1,0 +1,9 @@
+{
+  "appId": "com.recibos.app",
+  "appName": "Recibos App",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

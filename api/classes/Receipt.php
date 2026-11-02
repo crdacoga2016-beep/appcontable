@@ -1,0 +1,65 @@
+<?php
+require_once 'config.php';
+
+class Receipt {
+    private $db;
+
+    public function __construct($db) {
+        $this->db = $db;
+    }
+
+    public function addClient($userId, $name, $phone) {
+        $stmt = $this->db->prepare("INSERT INTO clients (user_id, name, phone) VALUES (?, ?, ?)");
+        return $stmt->execute([$userId, $name, $phone]) ? $this->db->lastInsertId() : false;
+    }
+
+    public function listClients($userId) {
+        $stmt = $this->db->prepare("SELECT * FROM clients WHERE user_id = ? ORDER BY name ASC");
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function addReceipt($userId, $clientId, $amount, $date, $method, $note, $filePath) {
+        $stmt = $this->db->prepare("INSERT INTO receipts (user_id, client_id, amount, receipt_date, method, note, file_path, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+        return $stmt->execute([$userId, $clientId, $amount, $date, $method, $note, $filePath]) ? $this->db->lastInsertId() : false;
+    }
+
+    public function listReceipts($userId, $clientId = null, $start = null, $end = null) {
+        $sql = "SELECT r.*, c.name AS client_name FROM receipts r LEFT JOIN clients c ON r.client_id = c.id WHERE r.user_id = ?";
+        $params = [$userId];
+        if ($clientId) { $sql .= " AND r.client_id = ?"; $params[] = $clientId; }
+        if ($start) { $sql .= " AND r.receipt_date >= ?"; $params[] = $start; }
+        if ($end) { $sql .= " AND r.receipt_date <= ?"; $params[] = $end; }
+        $sql .= " ORDER BY r.receipt_date DESC, r.id DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function totalByClient($userId, $clientId, $start = null, $end = null) {
+        $sql = "SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS cant FROM receipts WHERE user_id = ? AND client_id = ?";
+        $params = [$userId, $clientId];
+        if ($start) { $sql .= " AND receipt_date >= ?"; $params[] = $start; }
+        if ($end) { $sql .= " AND receipt_date <= ?"; $params[] = $end; }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch();
+    }
+
+    public function getReceipt($id, $userId) {
+        $stmt = $this->db->prepare("SELECT r.*, c.name AS client_name FROM receipts r LEFT JOIN clients c ON r.client_id = c.id WHERE r.id = ? AND r.user_id = ?");
+        $stmt->execute([$id, $userId]);
+        return $stmt->fetch();
+    }
+
+    public function deleteReceipt($id, $userId) {
+        $stmt = $this->db->prepare("SELECT file_path FROM receipts WHERE id = ? AND user_id = ?");
+        $stmt->execute([$id, $userId]);
+        $row = $stmt->fetch();
+        if (!$row) return false;
+        if ($row['file_path'] && file_exists($row['file_path'])) unlink($row['file_path']);
+        $stmt = $this->db->prepare("DELETE FROM receipts WHERE id = ? AND user_id = ?");
+        return $stmt->execute([$id, $userId]);
+    }
+}
+?>
