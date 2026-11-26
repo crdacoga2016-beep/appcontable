@@ -71,8 +71,18 @@ function withFileUrl($r) {
 function storeReceiptFile($file) {
     if (empty($file['tmp_name']) || ($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) return null;
     if (!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR, 0755, true);
+    if (!is_dir(THUMB_DIR)) @mkdir(THUMB_DIR, 0755, true);
 
     $base = uniqid('rec_', true);
+
+    // Si el celular ya la comprimió, solo generamos la miniatura (ahorra CPU y calidad).
+    if (ImageProcessor::isOptimized($file['tmp_name'])) {
+        $dest = UPLOAD_DIR . $base . '.jpg';
+        if (!move_uploaded_file($file['tmp_name'], $dest)) return null;
+        ImageProcessor::makeThumb($dest, THUMB_DIR . $base . '.jpg');
+        return $dest;
+    }
+
     $saved = ImageProcessor::process($file['tmp_name'], UPLOAD_DIR, $base);
     if ($saved) return UPLOAD_DIR . $saved;
 

@@ -8,6 +8,7 @@ const App = {
   currentClient: null,
   filter: { start: '', end: '', text: '' },
   chart: null,
+  screen: 'dashboard',
   editingId: null,
   editingClientId: null,
   pendingFile: null,
@@ -143,6 +144,7 @@ const App = {
 
   /* ---------------- navegación ---------------- */
   nav(screen) {
+    this.screen = screen;
     ['dashboard', 'clients', 'client', 'reports'].forEach(s => {
       const el = document.getElementById('screen-' + s);
       if (el) el.classList.toggle('hidden', s !== screen);
@@ -151,6 +153,7 @@ const App = {
     const titles = { dashboard: 'Inicio', clients: 'Clientes', client: 'Cliente', reports: 'Reportes' };
     document.getElementById('topbar-title').textContent = titles[screen] || 'AppContable';
     document.getElementById('fab-upload').classList.toggle('hidden', screen !== 'client');
+    if (screen === 'dashboard') this.renderDashboard();
     if (screen === 'clients') this.renderClients();
     if (screen === 'reports') this.renderReportSummary();
     window.scrollTo(0, 0);
@@ -165,8 +168,8 @@ const App = {
       const fresh = this.clients.find(x => Number(x.id) === Number(this.currentClient.id));
       if (fresh) this.currentClient = fresh;
     }
-    this.renderDashboard();
-    this.renderClients();
+    if (this.screen === 'dashboard') this.renderDashboard();
+    if (this.screen === 'clients') this.renderClients();
     this.fillClientSelects();
   },
 
@@ -512,21 +515,36 @@ const App = {
     }
   },
 
-  async compressImage(file, max, quality) {
-    if (!file || !/^image\//.test(file.type) || file.type === 'image/gif') return file;
+  async decodeImage(file) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        return await createImageBitmap(file, { imageOrientation: 'from-image' });
+      } catch (e) { /* usa el fallback */ }
+    }
+    const url = URL.createObjectURL(file);
     try {
-      const url = URL.createObjectURL(file);
-      const img = await new Promise((resolve, reject) => {
+      return await new Promise((resolve, reject) => {
         const i = new Image();
         i.onload = () => resolve(i);
         i.onerror = reject;
         i.src = url;
       });
+    } finally {
       URL.revokeObjectURL(url);
+    }
+  },
+
+  async compressImage(file, max, quality) {
+    if (!file || !/^image\//.test(file.type) || file.type === 'image/gif') return file;
+    try {
+      const img = await this.decodeImage(file);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       const scale = Math.min(1, max / Math.max(w, h));
-      if (scale === 1 && file.size < 900 * 1024) return file;
+      if (scale === 1 && file.size < 900 * 1024) {
+        if (img.close) img.close();
+        return file;
+      }
       const cw = Math.round(w * scale);
       const ch = Math.round(h * scale);
       const canvas = document.createElement('canvas');
@@ -536,6 +554,7 @@ const App = {
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, cw, ch);
       ctx.drawImage(img, 0, 0, cw, ch);
+      if (img.close) img.close();
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
       if (!blob) return file;
       return new File([blob], (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
@@ -566,7 +585,7 @@ const App = {
     fd.append('method', document.getElementById('up-method').value);
     fd.append('note', document.getElementById('up-note').value);
     if (this.pendingFile) {
-      const toSend = await this.compressImage(this.pendingFile, 1800, 0.85);
+      const toSend = await this.compressImage(this.pendingFile, 1600, 0.82);
       fd.append('file', toSend, toSend.name || 'foto.jpg');
     }
 

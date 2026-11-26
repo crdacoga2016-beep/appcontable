@@ -48,6 +48,30 @@ class ImageProcessor {
         return pathinfo(basename($filePath), PATHINFO_FILENAME) . '.jpg';
     }
 
+    // Ya viene optimizada desde el celular: no hace falta recomprimir la foto completa.
+    public static function isOptimized($path) {
+        $info = @getimagesize($path);
+        if (!$info) return false;
+        return $info[2] === IMAGETYPE_JPEG
+            && max($info[0], $info[1]) <= self::MAX_FULL
+            && @filesize($path) <= 900 * 1024;
+    }
+
+    public static function makeThumb($srcPath, $thumbPath) {
+        $info = @getimagesize($srcPath);
+        if (!$info) return false;
+        $src = self::open($srcPath, $info[2]);
+        if (!$src) return false;
+        $src = self::autoOrient($src, $srcPath);
+        $dir = dirname($thumbPath);
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $thumb = self::resize($src, imagesx($src), imagesy($src), self::MAX_THUMB);
+        $ok = @imagejpeg($thumb, $thumbPath, self::QUALITY_THUMB);
+        imagedestroy($thumb);
+        imagedestroy($src);
+        return $ok;
+    }
+
     private static function open($path, $type) {
         switch ($type) {
             case IMAGETYPE_JPEG: return @imagecreatefromjpeg($path);
