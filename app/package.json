@@ -1,6 +1,6 @@
 {
   "name": "appcontable",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "App de registro de comprobantes y auditoría",
   "main": "index.js",
   "scripts": {},
