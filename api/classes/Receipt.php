@@ -13,6 +13,32 @@ class Receipt {
         return $stmt->execute([$userId, $name, $phone]) ? $this->db->lastInsertId() : false;
     }
 
+    public function getClient($id, $userId) {
+        $stmt = $this->db->prepare("SELECT id, name, phone, created_at FROM clients WHERE id = ? AND user_id = ?");
+        $stmt->execute([$id, $userId]);
+        return $stmt->fetch();
+    }
+
+    public function updateClient($id, $userId, $name, $phone) {
+        $stmt = $this->db->prepare("UPDATE clients SET name = ?, phone = ? WHERE id = ? AND user_id = ?");
+        return $stmt->execute([$name, $phone, $id, $userId]);
+    }
+
+    public function deleteClient($id, $userId) {
+        $stmt = $this->db->prepare("SELECT file_path FROM receipts WHERE client_id = ? AND user_id = ?");
+        $stmt->execute([$id, $userId]);
+        $files = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $del = $this->db->prepare("DELETE FROM receipts WHERE client_id = ? AND user_id = ?");
+        $del->execute([$id, $userId]);
+        foreach ($files as $f) $this->removeFile($f);
+
+        $stmt = $this->db->prepare("DELETE FROM clients WHERE id = ? AND user_id = ?");
+        $stmt->execute([$id, $userId]);
+
+        return ['success' => true, 'deleted_receipts' => count($files)];
+    }
+
     public function listClients($userId) {
         $stmt = $this->db->prepare(
             "SELECT c.id, c.name, c.phone, c.created_at,
@@ -50,8 +76,8 @@ class Receipt {
         $params[] = $userId;
 
         $ok = $this->db->prepare($sql)->execute($params);
-        if ($ok && $newFile !== null && !empty($row['file_path']) && file_exists($row['file_path'])) {
-            @unlink($row['file_path']);
+        if ($ok && $newFile !== null && !empty($row['file_path'])) {
+            $this->removeFile($row['file_path']);
         }
         return $ok;
     }
@@ -90,8 +116,16 @@ class Receipt {
         $stmt->execute([$id, $userId]);
         $row = $stmt->fetch();
         if (!$row) return false;
-        if (!empty($row['file_path']) && file_exists($row['file_path'])) @unlink($row['file_path']);
+        $this->removeFile($row['file_path']);
         $stmt = $this->db->prepare("DELETE FROM receipts WHERE id = ? AND user_id = ?");
         return $stmt->execute([$id, $userId]);
+    }
+
+    private function removeFile($filePath) {
+        if (!empty($filePath) && file_exists($filePath)) @unlink($filePath);
+        if (!empty($filePath) && defined('THUMB_DIR')) {
+            $thumb = THUMB_DIR . pathinfo(basename($filePath), PATHINFO_FILENAME) . '.jpg';
+            if (file_exists($thumb)) @unlink($thumb);
+        }
     }
 }

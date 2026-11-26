@@ -1,0 +1,11 @@
+node_modules/
+app/android/
+*.keystore
+*.jks
+*.apk
+dist/
+
+# Fotos de producción: nunca subirlas al repo
+api/uploads/*
+!api/uploads/.gitkeep
+!api/uploads/.htaccess

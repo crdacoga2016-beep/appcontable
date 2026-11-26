@@ -141,8 +141,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary-2);box-shadow
 
 .back-btn{background:none;border:0;color:var(--primary);font-weight:700;font-size:13.5px;padding:4px 0 12px;cursor:pointer;display:flex;align-items:center;gap:7px}
 .client-hero{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.client-hero-info{flex:1;min-width:0}
 .client-hero-info h2{margin:0;font-size:20px;letter-spacing:-.4px}
 .client-hero-info p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.hero-actions{display:flex;gap:8px}
+.danger-ghost{color:#dc2626;background:#fef2f2}
 
 /* ---------- FILTERS ---------- */
 .filters{margin:16px 0 10px}

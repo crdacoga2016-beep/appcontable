@@ -9,6 +9,7 @@ const App = {
   filter: { start: '', end: '', text: '' },
   chart: null,
   editingId: null,
+  editingClientId: null,
   pendingFile: null,
 
   /* ---------------- utilidades ---------------- */
@@ -160,6 +161,10 @@ const App = {
     const [c, r] = await Promise.all([this.request('clients'), this.request('receipts')]);
     this.clients = (c && c.clients) || [];
     this.receipts = (r && r.receipts) || [];
+    if (this.currentClient) {
+      const fresh = this.clients.find(x => Number(x.id) === Number(this.currentClient.id));
+      if (fresh) this.currentClient = fresh;
+    }
     this.renderDashboard();
     this.renderClients();
     this.fillClientSelects();
@@ -273,6 +278,29 @@ const App = {
     this.renderReceipts();
   },
 
+  editCurrentClient() {
+    if (this.currentClient) this.openClientModal(this.currentClient.id);
+  },
+
+  async deleteCurrentClient() {
+    const c = this.currentClient;
+    if (!c) return;
+    const count = this.clientReceipts().length;
+    const msg = count
+      ? `¿Eliminar a ${c.name} y sus ${count} comprobante(s)? Se borrarán también las fotos y no se puede deshacer.`
+      : `¿Eliminar a ${c.name}?`;
+    if (!confirm(msg)) return;
+    const r = await this.request('client&id=' + c.id, { method: 'DELETE' });
+    if (r.success) {
+      this.toast('Cliente eliminado', 'ok');
+      this.currentClient = null;
+      await this.loadAll();
+      this.nav('clients');
+    } else {
+      this.toast(r.message || 'No se pudo eliminar', 'err');
+    }
+  },
+
   clientReceipts() {
     if (!this.currentClient) return [];
     return this.receipts.filter(r => Number(r.client_id) === Number(this.currentClient.id));
@@ -330,7 +358,7 @@ const App = {
     el.innerHTML = list.length ? list.map(r => `
       <div class="receipt-card">
         ${r.file_url
-          ? `<img class="thumb" src="${this.esc(r.file_url)}" alt="comprobante" loading="lazy" onclick="App.viewImage('${this.esc(r.file_url)}')">`
+          ? `<img class="thumb" src="${this.esc(r.thumb_url || r.file_url)}" alt="comprobante" loading="lazy" onclick="App.viewImage('${this.esc(r.file_url)}')">`
           : `<div class="thumb-ph"><i class="fas fa-image"></i></div>`}
         <div class="receipt-main">
           <div class="t">${this.money(r.amount)} COP</div>
@@ -392,7 +420,13 @@ const App = {
   },
 
   /* ---------------- modales ---------------- */
-  openClientModal() {
+  openClientModal(id) {
+    const c = id ? this.clients.find(x => Number(x.id) === Number(id)) : null;
+    this.editingClientId = c ? c.id : null;
+    document.getElementById('client-modal-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+    document.getElementById('btn-save-client').textContent = c ? 'Guardar cambios' : 'Guardar cliente';
+    document.getElementById('client-name-input').value = c ? c.name : '';
+    document.getElementById('client-phone-input').value = c && c.phone ? c.phone : '';
     document.getElementById('modal-client').classList.remove('hidden');
     setTimeout(() => document.getElementById('client-name-input').focus(), 120);
   },
@@ -461,15 +495,52 @@ const App = {
     const name = document.getElementById('client-name-input').value.trim();
     const phone = document.getElementById('client-phone-input').value.trim();
     if (!name) return this.toast('Escribe el nombre', 'err');
-    const r = await this.request('clients', { method: 'POST', body: { name, phone } });
+    const isEdit = !!this.editingClientId;
+    const r = isEdit
+      ? await this.request('client&id=' + this.editingClientId, { method: 'PUT', body: { name, phone } })
+      : await this.request('clients', { method: 'POST', body: { name, phone } });
     if (r.success) {
       this.closeModal('modal-client');
       document.getElementById('form-client').reset();
-      this.toast('Cliente creado', 'ok');
+      this.toast(isEdit ? 'Cliente actualizado' : 'Cliente creado', 'ok');
       await this.loadAll();
       this.renderClients();
+      if (isEdit && this.currentClient) this.openClient(this.currentClient.id);
+      this.editingClientId = null;
     } else {
-      this.toast(r.message || 'No se pudo crear', 'err');
+      this.toast(r.message || 'No se pudo guardar', 'err');
+    }
+  },
+
+  async compressImage(file, max, quality) {
+    if (!file || !/^image\//.test(file.type) || file.type === 'image/gif') return file;
+    try {
+      const url = URL.createObjectURL(file);
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = url;
+      });
+      URL.revokeObjectURL(url);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const scale = Math.min(1, max / Math.max(w, h));
+      if (scale === 1 && file.size < 900 * 1024) return file;
+      const cw = Math.round(w * scale);
+      const ch = Math.round(h * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (!blob) return file;
+      return new File([blob], (file.name || 'foto').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    } catch (e) {
+      return file;
     }
   },
 
@@ -494,7 +565,10 @@ const App = {
     fd.append('date', document.getElementById('up-date').value);
     fd.append('method', document.getElementById('up-method').value);
     fd.append('note', document.getElementById('up-note').value);
-    if (this.pendingFile) fd.append('file', this.pendingFile);
+    if (this.pendingFile) {
+      const toSend = await this.compressImage(this.pendingFile, 1800, 0.85);
+      fd.append('file', toSend, toSend.name || 'foto.jpg');
+    }
 
     const action = isEdit ? ('update_receipt&id=' + this.editingId) : 'receipts';
     const r = await this.request(action, { method: 'POST', form: true, body: fd });

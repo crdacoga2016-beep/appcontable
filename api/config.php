@@ -6,6 +6,7 @@ define('DB_USER', 'cambia_por_tu_usuario');
 define('DB_PASS', 'cambia_por_tu_password');
 define('APP_URL', 'https://tu-dominio.com/api');
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
+define('THUMB_DIR', UPLOAD_DIR . 'thumbs/');
 define('JWT_SECRET', 'cambia_esta_clave_secreta_muy_larga');
 define('JWT_EXPIRE', 7 * 24 * 60 * 60); // 7 días
 

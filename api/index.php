@@ -4,6 +4,7 @@ require_once 'db.php';
 require_once 'auth.php';
 require_once 'classes/Receipt.php';
 require_once 'classes/Report.php';
+require_once 'classes/ImageProcessor.php';
 
 $database = new Database();
 $db = $database->connect();
@@ -57,7 +58,28 @@ function withFileUrl($r) {
     $r['file_url'] = !empty($r['file_path'])
         ? APP_URL . '/uploads/' . rawurlencode(basename($r['file_path']))
         : null;
+    $thumb = !empty($r['file_path'])
+        ? THUMB_DIR . ImageProcessor::thumbName($r['file_path'])
+        : null;
+    $r['thumb_url'] = ($thumb && file_exists($thumb))
+        ? APP_URL . '/uploads/thumbs/' . rawurlencode(basename($thumb))
+        : $r['file_url'];
     return $r;
+}
+
+// Guarda la foto comprimida + miniatura. Si no se puede procesar, guarda el original.
+function storeReceiptFile($file) {
+    if (empty($file['tmp_name']) || ($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) return null;
+    if (!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR, 0755, true);
+
+    $base = uniqid('rec_', true);
+    $saved = ImageProcessor::process($file['tmp_name'], UPLOAD_DIR, $base);
+    if ($saved) return UPLOAD_DIR . $saved;
+
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'])) $ext = 'jpg';
+    $dest = UPLOAD_DIR . $base . '.' . $ext;
+    return move_uploaded_file($file['tmp_name'], $dest) ? $dest : null;
 }
 
 switch ($action) {
@@ -87,6 +109,25 @@ switch ($action) {
         }
         break;
 
+    case 'client':
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) { echo json_encode(['success' => false, 'message' => 'ID inválido']); break; }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+            echo json_encode($receipt->deleteClient($id, $userId));
+        } elseif (in_array($_SERVER['REQUEST_METHOD'], ['PUT', 'POST'], true)) {
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!is_array($data)) $data = $_POST;
+            $name = trim($data['name'] ?? '');
+            if ($name === '') { echo json_encode(['success' => false, 'message' => 'El nombre es obligatorio']); break; }
+            $ok = $receipt->updateClient($id, $userId, $name, $data['phone'] ?? '');
+            echo json_encode(['success' => $ok]);
+        } else {
+            $client = $receipt->getClient($id, $userId);
+            echo json_encode(['success' => (bool)$client, 'client' => $client]);
+        }
+        break;
+
     case 'receipts':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Handle multipart file upload
@@ -98,10 +139,8 @@ switch ($action) {
 
             $filePath = null;
             if (!empty($_FILES['file']['tmp_name'])) {
-                $ext = pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION);
-                $name = uniqid('rec_', true) . '.' . $ext;
-                $filePath = UPLOAD_DIR . $name;
-                if (!move_uploaded_file($_FILES['file']['tmp_name'], $filePath)) {
+                $filePath = storeReceiptFile($_FILES['file']);
+                if (!$filePath) {
                     http_response_code(500);
                     echo json_encode(['success' => false, 'message' => 'Error al guardar archivo']);
                     exit;
@@ -132,12 +171,8 @@ switch ($action) {
         if (!$id) { echo json_encode(['success' => false, 'message' => 'ID inválido']); break; }
         $filePath = null;
         if (!empty($_FILES['file']['tmp_name'])) {
-            $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'])) $ext = 'jpg';
-            if (!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR, 0755, true);
-            $name = uniqid('rec_', true) . '.' . $ext;
-            $dest = UPLOAD_DIR . $name;
-            if (move_uploaded_file($_FILES['file']['tmp_name'], $dest)) $filePath = $dest;
+            $filePath = storeReceiptFile($_FILES['file']);
+            if (!$filePath) { echo json_encode(['success' => false, 'message' => 'Error al guardar archivo']); break; }
         }
         $ok = $receipt->updateReceipt(
             $id,
